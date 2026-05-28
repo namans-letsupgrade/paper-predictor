@@ -72,27 +72,21 @@ export default function HomePage() {
   const [board, setBoard]     = useState('');
   const [cls, setCls]         = useState('');
   const [subject, setSubject] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
+  const [error, setError] = useState('');
 
   const handleBoardChange = (b: string) => { setBoard(b); setCls(''); setSubject(''); };
   const handleClassChange = (c: string) => { setCls(c);   setSubject(''); };
 
-  const handlePredict = async () => {
+  const handlePredict = () => {
     if (!board || !cls || !subject) { setError('Please select board, class, and subject.'); return; }
-    setError(''); setLoading(true);
-    try {
-      await fetch('/api/cold-start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ board, cls, subject }),
-      });
-      router.push(`/subject/${encodeURIComponent(board)}/${encodeURIComponent(cls)}/${encodeURIComponent(subject)}`);
-    } catch {
-      setError('Something went wrong. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    setError('');
+    // Fire cold-start in background — don't block navigation
+    fetch('/api/cold-start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ board, cls, subject }),
+    }).catch(() => {});
+    router.push(`/subject/${encodeURIComponent(board)}/${encodeURIComponent(cls)}/${encodeURIComponent(subject)}`);
   };
 
   const classOptions   = board ? (CLASSES[board] || []) : [];
@@ -207,17 +201,12 @@ export default function HomePage() {
                       id="predict-btn"
                       className="btn btn-primary btn-lg btn-full"
                       onClick={handlePredict}
-                      disabled={loading}
                       style={{ borderRadius: 10, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                     >
-                      {loading ? (
-                        <><div className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} /> Initialising…</>
-                      ) : (
-                        <>
-                          <span style={{ fontSize: 15 }}>✦</span>
-                          Predict Paper
-                        </>
-                      )}
+                      <>
+                        <span style={{ fontSize: 15 }}>✦</span>
+                        Predict Paper
+                      </>
                     </button>
                   </div>
                 </div>
