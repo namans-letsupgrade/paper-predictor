@@ -11,6 +11,8 @@ import {
   FlaskConical, Leaf, Globe, TrendingUp, Receipt,
   BarChart2, Users, Clock, Star, Lock, RefreshCw,
 } from 'lucide-react';
+import { getPastPaper, hasPastPaper } from '@/lib/data/past-papers';
+import { downloadPaperAsPDF } from '@/lib/generatePDF';
 
 interface Params { board: string; cls: string; subject: string }
 
@@ -89,9 +91,10 @@ const QUICK_STATS = [
 export default function SubjectPage({ params }: { params: Promise<Params> }) {
   const { board, cls, subject } = use(params);
   const router    = useRouter();
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState('');
-  const [dragOver, setDragOver] = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState('');
+  const [dragOver, setDragOver]     = useState(false);
+  const [dlLoading, setDlLoading]   = useState<number | null>(null);
 
   const b = decodeURIComponent(board);
   const c = decodeURIComponent(cls);
@@ -366,16 +369,24 @@ export default function SubjectPage({ params }: { params: Promise<Params> }) {
                           {year}
                         </span>
                         <button
-                          title="Download paper"
-                          onClick={(e) => {
+                          title={hasPastPaper(b, c, s, year) ? `Download ${year} Board Paper (PDF)` : 'Download paper'}
+                          disabled={dlLoading === year}
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            const filename = `${b.replace(/\s+/g, '_')}_Class_${c}_${s.replace(/\s+/g, '_')}_Board_Paper_${year}.pdf`;
-                            const link = document.createElement('a');
-                            link.href = '/sample-paper.pdf';
-                            link.download = filename;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
+                            const paper = getPastPaper(b, c, s, year);
+                            if (paper) {
+                              setDlLoading(year);
+                              await downloadPaperAsPDF(paper, b, c, s);
+                              setDlLoading(null);
+                            } else {
+                              const filename = `${b.replace(/\s+/g, '_')}_Class_${c}_${s.replace(/\s+/g, '_')}_Board_Paper_${year}.pdf`;
+                              const link = document.createElement('a');
+                              link.href = '/sample-paper.pdf';
+                              link.download = filename;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }
                           }}
                           style={{
                             width: 34, height: 34,
@@ -383,9 +394,10 @@ export default function SubjectPage({ params }: { params: Promise<Params> }) {
                             background: 'var(--gray-100)',
                             border: '1px solid var(--gray-200)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: 'pointer',
+                            cursor: dlLoading === year ? 'not-allowed' : 'pointer',
                             color: cfg.accentHex,
                             transition: 'all 200ms ease-out',
+                            position: 'relative',
                           }}
                           onMouseEnter={e => {
                             e.currentTarget.style.background = cfg.accentHex;
@@ -393,12 +405,26 @@ export default function SubjectPage({ params }: { params: Promise<Params> }) {
                             e.currentTarget.style.borderColor = cfg.accentHex;
                           }}
                           onMouseLeave={e => {
-                            e.currentTarget.style.background = 'var(--gray-100)';
-                            e.currentTarget.style.color = cfg.accentHex;
-                            e.currentTarget.style.borderColor = 'var(--gray-200)';
+                            if (dlLoading !== year) {
+                              e.currentTarget.style.background = 'var(--gray-100)';
+                              e.currentTarget.style.color = cfg.accentHex;
+                              e.currentTarget.style.borderColor = 'var(--gray-200)';
+                            }
                           }}
                         >
-                          <Download size={14} strokeWidth={2.5} />
+                          {dlLoading === year
+                            ? <div className="spinner" style={{ width: 12, height: 12, borderWidth: 2 }} />
+                            : <Download size={14} strokeWidth={2.5} />
+                          }
+                          {hasPastPaper(b, c, s, year) && (
+                            <span style={{
+                              position: 'absolute', top: -4, right: -4,
+                              width: 10, height: 10,
+                              background: '#22C55E',
+                              borderRadius: '50%',
+                              border: '1.5px solid white',
+                            }} />
+                          )}
                         </button>
                       </div>
                     </div>
